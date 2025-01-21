@@ -2,18 +2,16 @@ import requests
 import random
 import os
 import tkinter as tk
-#from dotenv import load_dotenv
 import threading
+import queue
 from colorama import Fore, init
 from elevenlabs.client import ElevenLabs
-from elevenlabs import play, save
+from elevenlabs import play
 
 init(autoreset=True)
 
-# load_dotenv()
-
-API_KEY =  "mPRThPBpIyxQMmzJR8Epbg6taOR5sBkY" #os.getenv('WEATHER_KEY')
-ELEVENLABS_API_KEY =  "sk_b75da21ac8a033356d53fc457f1abb267811a4cecdf2a90d" #os.getenv('ELEVENLABS_API_KEY')  # Add your ElevenLabs API key here
+API_KEY = "mPRThPBpIyxQMmzJR8Epbg6taOR5sBkY"
+ELEVENLABS_API_KEY = "sk_b75da21ac8a033356d53fc457f1abb267811a4cecdf2a90d"
 
 locations = {
     'Maryborough': {'lat': -25.532, 'lon': 152.701},
@@ -30,8 +28,10 @@ VERSION = "0.1.0"
 
 lock = threading.Lock()
 
-# Initialize the ElevenLabs client
 client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
+
+# Queue to store the audio tasks
+audio_queue = queue.Queue()
 
 def fetch_weather(city, lat, lon):
     print(Fore.YELLOW + f"Fetching weather data for {city}...")
@@ -40,7 +40,7 @@ def fetch_weather(city, lat, lon):
         'location': f'{lat},{lon}',
         'fields': ['temperature', 'humidity'],
         'timesteps': 'current',
-        'apikey': WEATHER_KEY
+        'apikey': API_KEY
     }
     
     response = requests.get(url, params=params)
@@ -54,25 +54,32 @@ def fetch_weather(city, lat, lon):
         print(Fore.RED + f"Error fetching data for {city}. Status code: {response.status_code}")
         return None, None
 
+def play_audio_sequentially():
+    while True:
+        # Wait until there is an audio task in the queue
+        audio_task = audio_queue.get()
+        if audio_task is None:
+            break  # Exit if None is received (used to stop the thread)
+        
+        play(audio_task)
+        audio_queue.task_done()
+
 def announce_weather_with_11labs(city, temperature, humidity, text_widget, output_file):
     print(Fore.YELLOW + f"Announcing weather for {city} using 11Labs API...")
     phrase = random.choice(phrases).format(city=city, temperature=temperature, humidity=humidity)
     
-    # Update the GUI with the spoken phrase
     text_widget.insert(tk.END, f"{phrase}\n\n")
     text_widget.yview(tk.END)
     
-    # Using ElevenLabs API to generate speech and play the audio
     audio = client.generate(
         text=phrase,
-        voice="Alice",  # Specify your desired voice
+        voice="Charlie",
         model="eleven_multilingual_v2"
     )
     
-    # Play the audio output
-    play(audio)
+    # Add the audio task to the queue for sequential processing
+    audio_queue.put(audio)
     
-    # Log the spoken phrase to the output file
     with open(output_file, "a") as file:
         file.write(f"{phrase}\n\n")
     
@@ -86,27 +93,23 @@ def fetch_and_announce_weather(city, coords, text_widget, output_file):
 def generate_random_example(text_widget, output_file):
     cities = ['Maryborough', 'Hervey Bay']
     random_city = random.choice(cities)
-    random_temp = random.randint(15, 35)  # Random temperature between 15 and 35
-    random_humidity = random.randint(40, 90)  # Random humidity between 40% and 90%
+    random_temp = random.randint(15, 35)
+    random_humidity = random.randint(40, 90)
     
     phrase = random.choice(phrases).format(city=random_city, temperature=random_temp, humidity=random_humidity)
     
-    # Update the GUI with the random example
     text_widget.insert(tk.END, f"{phrase}\n\n")
     text_widget.yview(tk.END)
     
-    # Using ElevenLabs API to generate speech and play the audio
     audio = client.generate(
         text=phrase,
-        voice="Alice",  # Specify your desired voice
+        voice="Charlie",
         model="eleven_multilingual_v2"
     )
     
-    # Play the audio output
-    play(audio)
-    save(audio)
+    # Add the audio task to the queue for sequential processing
+    audio_queue.put(audio)
 
-    # Log the random example to the output file
     with open(output_file, "a") as file:
         file.write(f"{phrase}\n\n")
 
@@ -126,7 +129,7 @@ def display_weather():
     text_widget.config(yscrollcommand=scrollbar.set)
     scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
     
-    output_file = "weather_update.txt"  # The file to store weather updates
+    output_file = "weather_update.txt"
     
     def on_button_click():
         print(Fore.YELLOW + "Button clicked, starting to fetch weather data...")
@@ -146,6 +149,10 @@ def display_weather():
     random_example_button.pack(padx=20, pady=10)
 
     window.geometry("500x400")
+    
+    # Start the audio queue processing thread
+    threading.Thread(target=play_audio_sequentially, daemon=True).start()
+    
     window.mainloop()
 
 display_weather()

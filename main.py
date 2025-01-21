@@ -1,17 +1,19 @@
 import requests
-import pyttsx3
 import random
-from dotenv import load_dotenv
 import os
 import tkinter as tk
-from colorama import Fore, init
+#from dotenv import load_dotenv
 import threading
+from colorama import Fore, init
+from elevenlabs.client import ElevenLabs
+from elevenlabs import play, save
 
 init(autoreset=True)
 
-load_dotenv()
+# load_dotenv()
 
-API_KEY = os.getenv('API_KEY')
+API_KEY =  "mPRThPBpIyxQMmzJR8Epbg6taOR5sBkY" #os.getenv('WEATHER_KEY')
+ELEVENLABS_API_KEY =  "sk_b75da21ac8a033356d53fc457f1abb267811a4cecdf2a90d" #os.getenv('ELEVENLABS_API_KEY')  # Add your ElevenLabs API key here
 
 locations = {
     'Maryborough': {'lat': -25.532, 'lon': 152.701},
@@ -28,6 +30,9 @@ VERSION = "0.1.0"
 
 lock = threading.Lock()
 
+# Initialize the ElevenLabs client
+client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
+
 def fetch_weather(city, lat, lon):
     print(Fore.YELLOW + f"Fetching weather data for {city}...")
     url = f'https://api.tomorrow.io/v4/timelines'
@@ -35,7 +40,7 @@ def fetch_weather(city, lat, lon):
         'location': f'{lat},{lon}',
         'fields': ['temperature', 'humidity'],
         'timesteps': 'current',
-        'apikey': API_KEY
+        'apikey': WEATHER_KEY
     }
     
     response = requests.get(url, params=params)
@@ -49,32 +54,34 @@ def fetch_weather(city, lat, lon):
         print(Fore.RED + f"Error fetching data for {city}. Status code: {response.status_code}")
         return None, None
 
-def announce_weather(city, temperature, humidity, text_widget, output_file):
-    print(Fore.YELLOW + f"Announcing weather for {city}...")
-    engine = pyttsx3.init()
-    rate = engine.getProperty('rate')
-    engine.setProperty('rate', rate - 50)
+def announce_weather_with_11labs(city, temperature, humidity, text_widget, output_file):
+    print(Fore.YELLOW + f"Announcing weather for {city} using 11Labs API...")
     phrase = random.choice(phrases).format(city=city, temperature=temperature, humidity=humidity)
     
-    text_widget.insert(tk.END, f"{phrase}\n\n")  # Removed "Weather Update:"
+    # Update the GUI with the spoken phrase
+    text_widget.insert(tk.END, f"{phrase}\n\n")
     text_widget.yview(tk.END)
     
-    voices = engine.getProperty('voices')
-    engine.setProperty('voice', voices[1].id)
+    # Using ElevenLabs API to generate speech and play the audio
+    audio = client.generate(
+        text=phrase,
+        voice="Alice",  # Specify your desired voice
+        model="eleven_multilingual_v2"
+    )
     
-    with lock:  # Ensure that only one thread is speaking at a time
-        engine.say(phrase)
-        engine.runAndWait()
+    # Play the audio output
+    play(audio)
     
+    # Log the spoken phrase to the output file
     with open(output_file, "a") as file:
-        file.write(f"{phrase}\n\n")  # Removed "Weather Update:"
+        file.write(f"{phrase}\n\n")
     
     print(Fore.GREEN + f"Finished announcing weather for {city}.")
 
 def fetch_and_announce_weather(city, coords, text_widget, output_file):
     temperature, humidity = fetch_weather(city, coords['lat'], coords['lon'])
     if temperature is not None and humidity is not None:
-        announce_weather(city, temperature, humidity, text_widget, output_file)
+        announce_weather_with_11labs(city, temperature, humidity, text_widget, output_file)
 
 def generate_random_example(text_widget, output_file):
     cities = ['Maryborough', 'Hervey Bay']
@@ -84,21 +91,24 @@ def generate_random_example(text_widget, output_file):
     
     phrase = random.choice(phrases).format(city=random_city, temperature=random_temp, humidity=random_humidity)
     
-    text_widget.insert(tk.END, f"{phrase}\n\n")  # Display the random example in the GUI
+    # Update the GUI with the random example
+    text_widget.insert(tk.END, f"{phrase}\n\n")
     text_widget.yview(tk.END)
     
-    engine = pyttsx3.init()
-    rate = engine.getProperty('rate')
-    engine.setProperty('rate', rate - 50)
-    voices = engine.getProperty('voices')
-    engine.setProperty('voice', voices[1].id)
+    # Using ElevenLabs API to generate speech and play the audio
+    audio = client.generate(
+        text=phrase,
+        voice="Alice",  # Specify your desired voice
+        model="eleven_multilingual_v2"
+    )
     
-    with lock:  # Ensure that only one thread is speaking at a time
-        engine.say(phrase)
-        engine.runAndWait()
-    
+    # Play the audio output
+    play(audio)
+    save(audio)
+
+    # Log the random example to the output file
     with open(output_file, "a") as file:
-        file.write(f"{phrase}\n\n")  # Write the random example to the file
+        file.write(f"{phrase}\n\n")
 
 def display_weather():
     print(Fore.YELLOW + "Initializing Tkinter window...")
@@ -126,7 +136,6 @@ def display_weather():
     
     def on_random_example_click():
         print(Fore.YELLOW + "Button clicked, displaying random weather example...")
-        # Running the random example generation in a new thread
         threading.Thread(target=generate_random_example, args=(text_widget, output_file), daemon=True).start()
         print(Fore.GREEN + "\nRandom example displayed.")
     

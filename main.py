@@ -1,6 +1,5 @@
 import requests
 import random
-import os
 import tkinter as tk
 import threading
 import queue
@@ -103,7 +102,6 @@ def log_message(message, log_file="app_log.txt"):
         file.write(full_message)
 
 def generate_dynamic_phrase(city, temperature, humidity):
-    """Generate a weather phrase dynamically."""
     phrase = f"{random.choice(greetings)} {random.choice(temperature_phrases)} {random.choice(humidity_phrases)}"
     return phrase.format(city=city, temperature=temperature, humidity=humidity)
 

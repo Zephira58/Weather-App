@@ -10,8 +10,8 @@ from elevenlabs import play
 
 init(autoreset=True)
 
-API_KEY = "mPRThPBpIyxQMmzJR8Epbg6taOR5sBkY"
-ELEVENLABS_API_KEY = "sk_b75da21ac8a033356d53fc457f1abb267811a4cecdf2a90d"
+API_KEY = "[LOADAPIKEY HERE]"
+ELEVENLABS_API_KEY = "LOADAPIKEY HERE"
 
 locations = {
     'Maryborough': {'lat': -25.532, 'lon': 152.701},

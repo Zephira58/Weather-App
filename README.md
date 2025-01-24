@@ -7,4 +7,5 @@ Weather App is a simple Python-based application designed to fetch and announce 
 - **Fetches current weather for Maryborough and Hervey Bay?** ✔ 
 - **Announces temperature and humidity aloud?** ✔
 - **Simple GUI for interaction?** ✔
+- **Has 8,000 combinations for saying the weather?** ✔
 - **Bakes you a cake?** ❌
